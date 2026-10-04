@@ -1,0 +1,10 @@
+{
+  "name": "hospital-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "api": "npm --prefix hospital-api run dev",
+    "frontend": "npm --prefix hospital-frontend run dev",
+    "build": "npm --prefix hospital-frontend run build"
+  }
+}
