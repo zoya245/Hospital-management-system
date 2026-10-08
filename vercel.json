@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "hospital-api": {
+      "root": "hospital-api",
+      "framework": "express"
+    },
+    "hospital-frontend": {
+      "root": "hospital-frontend",
+      "framework": "vite"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "hospital-api"
+      }
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": {
+        "service": "hospital-api"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "hospital-frontend"
+      }
+    }
+  ]
+}

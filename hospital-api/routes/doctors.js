@@ -204,7 +204,7 @@ router.get('/doctors/:id/dashboard', async (req, res) => {
                 a.appointment_id,
                 a.patient_id,
                 a.doctor_id,
-                a.appointment_date,
+                DATE_FORMAT(a.appointment_date, '%Y-%m-%d') as appointment_date,
                 a.appointment_time,
                 a.status,
                 a.is_emergency,
@@ -262,7 +262,7 @@ router.get('/doctors/:id/appointments', async (req, res) => {
             a.appointment_id,
             a.patient_id,
             a.doctor_id,
-            a.appointment_date,
+            DATE_FORMAT(a.appointment_date, '%Y-%m-%d') as appointment_date,
             a.appointment_time,
             a.status,
             a.is_emergency,
@@ -319,7 +319,7 @@ router.get('/doctors/:id/schedule', async (req, res) => {
                 a.appointment_id,
                 a.patient_id,
                 a.doctor_id,
-                a.appointment_date,
+                DATE_FORMAT(a.appointment_date, '%Y-%m-%d') as appointment_date,
                 a.appointment_time,
                 a.status,
                 a.is_emergency,
@@ -343,11 +343,17 @@ router.get('/doctors/:id/schedule', async (req, res) => {
 
         const todayStr = new Date().toISOString().split('T')[0];
 
-        const formatted = rows.map(r => ({
-            ...r,
-            formatted_time: formatTo12Hr(r.appointment_time),
-            schedule_text: `${formatTo12Hr(r.appointment_time)} → ${r.patient_name} → ${r.status}`
-        }));
+        const formatted = rows.map(r => {
+            const dateStr = r.appointment_date instanceof Date 
+                ? r.appointment_date.toISOString().split('T')[0] 
+                : String(r.appointment_date).split('T')[0];
+            return {
+                ...r,
+                appointment_date: dateStr,
+                formatted_time: formatTo12Hr(r.appointment_time),
+                schedule_text: `${formatTo12Hr(r.appointment_time)} → ${r.patient_name} → ${r.status}`
+            };
+        });
 
         const today = formatted.filter(a => a.appointment_date === todayStr);
         const upcoming = formatted.filter(a => a.appointment_date > todayStr && a.status !== 'Cancelled' && a.status !== 'Completed');

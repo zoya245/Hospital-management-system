@@ -299,7 +299,7 @@ const ReceptionistDashboard = ({ data, onUpdate }) => {
   );
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayAppointments = appointments.filter(a => a.appointment_date === todayStr && a.status !== 'Cancelled');
+  const todayAppointments = appointments.filter(a => String(a.appointment_date || '').split('T')[0] === todayStr && a.status !== 'Cancelled');
   const pendingBills = bills.filter(b => b.status === 'Pending');
   const lowStockMedicines = inventoryList.filter(m => m.stock < 50);
   const getMaxCount = (arr, key) => Math.max(...arr.map(i => i[key]), 1);
@@ -367,7 +367,7 @@ const ReceptionistDashboard = ({ data, onUpdate }) => {
     if (!dailyScheduleDoctorId) return [];
     return appointments.filter(a => 
       a.doctor_id.toString() === dailyScheduleDoctorId.toString() &&
-      (!dailyScheduleDate || a.appointment_date === dailyScheduleDate)
+      (!dailyScheduleDate || String(a.appointment_date || '').split('T')[0] === dailyScheduleDate)
     ).sort((a, b) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
   }, [appointments, dailyScheduleDoctorId, dailyScheduleDate]);
 

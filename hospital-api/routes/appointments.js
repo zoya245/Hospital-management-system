@@ -8,7 +8,21 @@ const { sendAppointmentConfirmation } = require('../utils/emailService');
 // 1. GET ALL APPOINTMENTS
 router.get('/appointments', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM Appointment ORDER BY appointment_date DESC, appointment_time DESC');
+        const [rows] = await pool.query(`
+            SELECT 
+                appointment_id, 
+                patient_id, 
+                doctor_id, 
+                DATE_FORMAT(appointment_date, '%Y-%m-%d') as appointment_date, 
+                appointment_time, 
+                status, 
+                is_emergency, 
+                doctor_rating, 
+                symptoms_raw, 
+                symptoms_medical 
+            FROM appointment 
+            ORDER BY appointment_date DESC, appointment_time DESC
+        `);
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -43,7 +57,7 @@ router.get('/appointments/:id/details', async (req, res) => {
                 a.appointment_id,
                 a.patient_id,
                 a.doctor_id,
-                a.appointment_date,
+                DATE_FORMAT(a.appointment_date, '%Y-%m-%d') as appointment_date,
                 a.appointment_time,
                 a.status,
                 a.is_emergency,

@@ -38,7 +38,7 @@ const DoctorSchedule = ({ doctorId, onStartConsultation }) => {
     let list = scheduleData[activeTab] || scheduleData.all || [];
 
     if (selectedDate) {
-      list = list.filter(a => a.appointment_date === selectedDate);
+      list = list.filter(a => String(a.appointment_date || '').split('T')[0] === selectedDate);
     }
 
     if (searchTerm.trim()) {

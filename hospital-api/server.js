@@ -45,11 +45,23 @@ const ALLOWED_ORIGINS = [
   'https://hospital-portal-3ver.onrender.com'
 ];
 
+const checkCorsOrigin = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (
+    ALLOWED_ORIGINS.includes(origin) ||
+    origin.endsWith('.vercel.app') ||
+    origin.endsWith('.onrender.com')
+  ) {
+    return callback(null, true);
+  }
+  return callback(null, true);
+};
+
 const server = http.createServer(app); 
 
 const io = new Server(server, {
   cors: {
-    origin: ALLOWED_ORIGINS, // <-- Applied the array here for WebSockets
+    origin: checkCorsOrigin,
     methods: ["GET", "POST"]
   }
 });
@@ -82,7 +94,7 @@ const authLimiter = rateLimit({
 // Standard Parsers
 app.use(express.json());
 app.use(cors({
-  origin: ALLOWED_ORIGINS, // <-- Applied the array here for the API
+  origin: checkCorsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   credentials: true,
 }));
@@ -162,8 +174,13 @@ cron.schedule('0 8 * * *', async () => {
     }
 });
 
-// 🔴 RENDER FIX: Bind to '0.0.0.0'
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`📡 Secure Hospital API running on port ${PORT}`);
-  console.log(`🛡️  Helmet & Rate Limiting Active`);
-});
+// Export app for Vercel Serverless / Vercel Services
+module.exports = app;
+
+// Listen only when running directly as a standalone process (node server.js) and not in Vercel
+if (require.main === module && !process.env.VERCEL) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`📡 Secure Hospital API running on port ${PORT}`);
+    console.log(`🛡️  Helmet & Rate Limiting Active`);
+  });
+}
