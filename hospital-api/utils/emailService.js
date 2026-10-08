@@ -76,11 +76,12 @@ const sendWelcomeEmail = async (patientEmail, patientName) => {
 
 // 4. APPOINTMENT REMINDER (Uses the Universal Notification Template: EMAILJS_TEMPLATE_WELCOME)
 const sendAppointmentConfirmation = async (patientEmail, patientName, doctorName, date, time) => {
+    const formattedDoctor = (doctorName || '').startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`;
     return await sendEmailJS(process.env.EMAILJS_TEMPLATE_WELCOME, {
         to_email: patientEmail,
         header: 'Appointment Confirmed ✅',
         patient_name: patientName,
-        body_text: `Your upcoming appointment with Dr. ${doctorName} has been successfully scheduled in our system. Please try to arrive 10 minutes early.`,
+        body_text: `Your upcoming appointment with ${formattedDoctor} has been successfully scheduled in our system. Please try to arrive 10 minutes early.`,
         highlight_text: `📅 Date: ${date} | ⏰ Time: ${time}`
     });
 };

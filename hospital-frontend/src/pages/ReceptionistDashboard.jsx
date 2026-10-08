@@ -633,7 +633,7 @@ const ReceptionistDashboard = ({ data, onUpdate }) => {
                         {getPatientName(a.patient_id, data.patients)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 font-medium">
-                        Dr. {getDoctorName(a.doctor_id)}
+                        {getDoctorName(a.doctor_id)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         {(a.status === 'Scheduled' || a.status === 'Confirmed') ? (

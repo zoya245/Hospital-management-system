@@ -721,7 +721,7 @@ const PatientDashboard = ({ userId, data, onSchedule, onUpdate }) => {
                           Doctor & Department
                         </p>
                         <h4 className="text-xl font-black text-slate-900">
-                          Dr. {getDoctorName(nextUpcomingAppointment.doctor_id)}
+                          {getDoctorName(nextUpcomingAppointment.doctor_id)}
                         </h4>
                         <p className="text-xs text-slate-500 font-medium mt-0.5">
                           Hospital Consultation Room • Slot Booking Confirmed
@@ -953,7 +953,7 @@ const PatientDashboard = ({ userId, data, onSchedule, onUpdate }) => {
                           Appointment #{a.appointment_id}
                         </span>
                         <h4 className="text-lg font-black text-slate-900 mt-0.5">
-                          Dr. {getDoctorName(a.doctor_id)}
+                          {getDoctorName(a.doctor_id)}
                         </h4>
                       </div>
 
@@ -1076,7 +1076,7 @@ const PatientDashboard = ({ userId, data, onSchedule, onUpdate }) => {
                         Visit Date: {(rec.visit_date || '').split('T')[0]}
                       </span>
                       <h4 className="font-black text-slate-900 text-xl mt-1.5">{rec.diagnosis}</h4>
-                      <p className="text-xs text-slate-500 font-medium">Attending Physician: Dr. {rec.doctor_name || 'Hospital Staff'}</p>
+                      <p className="text-xs text-slate-500 font-medium">Attending Physician: {(rec.doctor_name || '').startsWith('Dr.') ? rec.doctor_name : `Dr. ${rec.doctor_name || 'Hospital Staff'}`}</p>
                     </div>
 
                     <div className="flex items-center gap-2">

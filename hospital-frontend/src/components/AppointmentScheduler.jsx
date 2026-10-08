@@ -94,9 +94,11 @@ const AppointmentScheduler = ({ patientId, doctors, onSchedule }) => {
       if (!response.ok) throw new Error(data.error || 'AI Analysis failed.');
 
       setSelectedDoctorId(data.recommended_doctor_id.toString());
-      setSymptomsMedical(data.medical_terms); 
-      setPatientExplanation(data.patient_friendly_explanation); 
-      setTriageSuccess(`AI Recommendation: We have selected Dr. ${data.recommended_doctor_name} (${data.specialty}) based on your symptoms.`);
+      setSymptomsMedical(data.medical_terms);
+      setPatientExplanation(data.patient_friendly_explanation);
+      const rawDocName = data.recommended_doctor_name || '';
+      const docDisplayName = rawDocName.startsWith('Dr.') ? rawDocName : `Dr. ${rawDocName}`;
+      setTriageSuccess(`AI Recommendation: We have selected ${docDisplayName} (${data.specialty}) based on your symptoms.`);
       
     } catch (err) {
       setError("Our AI is currently unavailable. Please select a doctor manually from the dropdown.");
