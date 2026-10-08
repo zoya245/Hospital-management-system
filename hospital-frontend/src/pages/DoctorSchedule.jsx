@@ -69,13 +69,33 @@ const DoctorSchedule = ({ doctorId, onStartConsultation }) => {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Confirmed':
-        return <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200">Confirmed</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200/80 shadow-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Confirmed
+          </span>
+        );
       case 'Completed':
-        return <span className="bg-blue-100 text-blue-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-blue-200">Completed</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full border border-indigo-200/80 shadow-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+            Completed
+          </span>
+        );
       case 'Cancelled':
-        return <span className="bg-rose-100 text-rose-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-rose-200">Cancelled</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 text-xs font-bold px-3 py-1 rounded-full border border-rose-200/80 shadow-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            Cancelled
+          </span>
+        );
       default:
-        return <span className="bg-amber-100 text-amber-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-amber-200">Scheduled</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 text-xs font-bold px-3 py-1 rounded-full border border-amber-200/80 shadow-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            Scheduled
+          </span>
+        );
     }
   };
 

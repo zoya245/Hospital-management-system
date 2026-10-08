@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LoaderCircle, KeyRound, UserCircle, ArrowLeft } from 'lucide-react';
+import { LoaderCircle, KeyRound, UserCircle, ArrowLeft, Building2 } from 'lucide-react';
 import { API_BASE_URL } from '../config'; 
 
 const StaffLogin = ({ role, onLoginSuccess }) => {
@@ -224,7 +224,7 @@ const StaffLogin = ({ role, onLoginSuccess }) => {
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
                   className={`w-full p-3 pl-10 border border-slate-200 rounded-xl focus:ring-2 outline-none transition ${theme.ring}`} 
-                  placeholder="Default: password123" 
+                  placeholder="Enter your password" 
                   required 
                 />
             </div>

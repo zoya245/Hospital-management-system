@@ -129,19 +129,33 @@ const App = () => {
   };
 
   const handleLoginSuccess = (role, id, name) => {
-    setCurrentUser({ role, id, name });
+    localStorage.setItem('user_role', role);
+    if (id) localStorage.setItem('user_id', String(id));
+    if (name) localStorage.setItem('user_name', name);
+    setCurrentUser({ role, id: parseInt(id, 10) || id, name });
     setActiveView('dashboard');
     setIsLoginModalOpen(false);
-    showNotification(`Welcome back, ${name}!`, 'success');
+    showNotification(`Welcome, ${name}!`, 'success');
   };
 
   const handleRegister = (newPatientFromApi) => {
+    const patientId = newPatientFromApi.patient_id || newPatientFromApi.user?.patient_id || newPatientFromApi.user?.id;
+    const patientName = newPatientFromApi.name || newPatientFromApi.user?.name;
+    const token = newPatientFromApi.token;
+
+    if (token) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user_id', String(patientId));
+      localStorage.setItem('user_name', patientName);
+      localStorage.setItem('user_role', 'Patient');
+    }
+
     setData(prevData => ({
       ...prevData,
-      patients: [...prevData.patients, newPatientFromApi]
+      patients: [...prevData.patients, newPatientFromApi.user || newPatientFromApi]
     }));
-    handleLoginSuccess('Patient', newPatientFromApi.patient_id, newPatientFromApi.name);
-    showNotification('Registration successful! Welcome to Pulse HMS.', 'success');
+
+    handleLoginSuccess('Patient', patientId, patientName);
   };
 
   const handleNavigateToSection = (sectionId) => {
@@ -280,6 +294,8 @@ const App = () => {
       case USER_ROLES.PATIENT:
         return <PatientDashboard userId={currentUser.id} data={data} onSchedule={handleScheduleAppointment} onUpdate={setData} />;
       case USER_ROLES.RECEPTIONIST:
+      case 'Staff':
+      case 'Nurse':
         return <ReceptionistDashboard data={data} onUpdate={setData} />;
       default:
         return <HomePage onOpenAuth={handleOpenAuthModal} />;
@@ -292,8 +308,10 @@ const App = () => {
 
   const isGuest = currentUser.role === USER_ROLES.HOME;
 
+  const isFullWidthView = !isGuest || activeView === 'doctors';
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-700">
+    <div className="min-h-screen bg-slate-50/90 font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-700">
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       {renderLoginModal()}
 
@@ -304,9 +322,9 @@ const App = () => {
         <div className="absolute -bottom-[20%] right-[20%] w-[45%] h-[45%] rounded-full bg-pink-100/30 blur-3xl opacity-50"></div>
       </div>
 
-      <div className="relative z-10 p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className={`relative z-10 px-3 sm:px-6 lg:px-8 py-3 sm:py-5 w-full mx-auto transition-all duration-300 ${isFullWidthView ? 'max-w-[1880px]' : 'max-w-7xl'}`}>
         {/* GLASS NAVBAR */}
-        <header className="sticky top-4 z-40 bg-white/80 backdrop-blur-2xl border border-white/60 shadow-lg shadow-slate-200/40 rounded-3xl p-4 mb-8 flex flex-col md:flex-row justify-between items-center gap-4 transition-all duration-300">
+        <header className="sticky top-3 z-40 bg-white/85 backdrop-blur-2xl border border-white/70 shadow-lg shadow-slate-200/40 rounded-3xl p-3.5 sm:p-4 mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-center gap-4 transition-all duration-300">
           
           {/* Brand Logo */}
           <div 
@@ -389,10 +407,10 @@ const App = () => {
             </div>
           ) : (
             /* LOGGED IN USER NAVBAR: ACTIVE ROLE PILL + DASHBOARD/HOME TOGGLE + LOGOUT */
-            <div className="flex items-center gap-3 bg-slate-100/70 p-1.5 rounded-2xl border border-slate-200/50 flex-wrap justify-center">
+            <div className="flex items-center gap-2.5 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60 flex-wrap justify-center">
               
               {/* Role Pill */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-xl shadow-sm border border-slate-100 text-xs font-bold text-slate-800">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-xl shadow-xs border border-slate-100 text-xs font-extrabold text-slate-800">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -400,15 +418,16 @@ const App = () => {
                 <span>{currentUser.role} Portal</span>
               </div>
 
-              <span className="text-xs font-bold text-slate-700 hidden sm:inline px-2">
-                Hi, {currentUser.name}
-              </span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/70 rounded-xl text-xs font-bold text-slate-700 border border-slate-100">
+                <User className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="truncate max-w-[140px] sm:max-w-[200px]">{currentUser.name}</span>
+              </div>
 
               {/* Patient: View Doctors & Availability Timings */}
               {currentUser.role === USER_ROLES.PATIENT && (
                 <button
                   onClick={() => setActiveView(activeView === 'doctors' ? 'dashboard' : 'doctors')}
-                  className="px-3 py-1.5 text-xs font-bold rounded-xl text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Stethoscope className="w-3.5 h-3.5" />
                   <span>{activeView === 'doctors' ? 'My Dashboard' : 'Specialists & Timings'}</span>
@@ -419,7 +438,7 @@ const App = () => {
               {currentUser.role !== USER_ROLES.DOCTOR && (
                 <button
                   onClick={() => setActiveView(activeView === 'dashboard' ? 'home' : 'dashboard')}
-                  className="px-3 py-1.5 text-xs font-bold rounded-xl text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   {activeView === 'dashboard' ? (
                     <>
@@ -449,7 +468,7 @@ const App = () => {
         </header>
 
         {/* MAIN BODY */}
-        <main className="animate-fade-in">
+        <main className="animate-fade-in w-full">
           {renderDashboard()}
         </main>
       </div>

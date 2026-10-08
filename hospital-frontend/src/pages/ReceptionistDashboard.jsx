@@ -174,11 +174,7 @@ const ReceptionistDashboard = ({ data, onUpdate }) => {
   const handleUpdateBillStatus = async (billId, newStatus) => {
     setBills(prev => prev.map(b => b.bill_id === billId ? { ...b, status: newStatus } : b));
     try { 
-      await fetch(`${API_BASE_URL}/bills/${billId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
+      await api.billing.updateStatus(billId, newStatus);
     } catch (error) { 
       console.error(error); 
     }
@@ -375,164 +371,234 @@ const ReceptionistDashboard = ({ data, onUpdate }) => {
     ).sort((a, b) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
   }, [appointments, dailyScheduleDoctorId, dailyScheduleDate]);
 
+  const staffNavItems = [
+    { id: RECEPTION_TABS.OPERATIONS, label: 'Operations & Queue', subtitle: 'Live Patient Stream', icon: Activity, badge: todayAppointments.length > 0 ? `${todayAppointments.length} Today` : null, badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' },
+    { id: RECEPTION_TABS.SCHEDULE, label: 'Doctor Schedule', subtitle: 'Timelines & Rosters', icon: CalendarRange, badge: null },
+    { id: RECEPTION_TABS.DOCTORS, label: 'Manage Doctors', subtitle: 'Registry & Onboarding', icon: Stethoscope, badge: `${doctors.length}`, badgeColor: 'bg-indigo-500/20 text-indigo-200 border-indigo-400/30' },
+    { id: RECEPTION_TABS.PATIENTS, label: 'Patient Registry', subtitle: 'Demographics & Records', icon: User, badge: `${patients.length}`, badgeColor: 'bg-violet-500/20 text-violet-200 border-violet-400/30' },
+    { id: RECEPTION_TABS.BILLING, label: 'Billing & Invoices', subtitle: 'Payment Processing', icon: CreditCard, badge: pendingBills.length > 0 ? `${pendingBills.length} Pending` : null, badgeColor: 'bg-amber-500/20 text-amber-200 border-amber-400/30' },
+    { id: RECEPTION_TABS.PHARMACY, label: 'Pharmacy Stock', subtitle: 'Inventory & Alerts', icon: Pill, badge: lowStockMedicines.length > 0 ? `${lowStockMedicines.length} Low` : null, badgeColor: 'bg-rose-500/20 text-rose-200 border-rose-400/30' }
+  ];
+
   return (
-    <div className="space-y-8 pb-12 animate-fade-in">
+    <div className="w-full flex flex-col lg:flex-row gap-6 xl:gap-8 items-start pb-16 animate-fade-in">
       
       {/* ========================================================= */}
-      {/* 1. RECEPTION CONSOLE BANNER                                */}
+      {/* 1. AESTHETIC LEFT SIDEBAR (STAFF OPERATIONS CONSOLE)      */}
       {/* ========================================================= */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-          <Activity className="w-64 h-64" />
-        </div>
-        <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-2 border border-emerald-400/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              <span>Active Staff & Reception Console</span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">Hospital Administration Desk</h2>
-            <p className="mt-1 text-slate-300 text-xs sm:text-sm">Real-time appointments, billing invoices, doctor scheduling & pharmacy inventory</p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => handleOpenDoctorModal()}
-              className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4" /> Add Doctor
-            </button>
-            <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 text-right">
-              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Global Status</p>
-              <p className="text-sm font-bold text-emerald-400">All Nodes Connected</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================= */}
-      {/* 2. STATS ROW                                              */}
-      {/* ========================================================= */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-        <div 
-          onClick={() => setActiveTab(RECEPTION_TABS.OPERATIONS)}
-          className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all border border-slate-100 flex items-center gap-4 cursor-pointer"
-        >
-          <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 shadow-sm"><Calendar className="w-6 h-6 sm:w-7 sm:h-7" /></div>
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Visits</p>
-            <p className="text-2xl sm:text-3xl font-black text-slate-800">{todayAppointments.length}</p>
-          </div>
-        </div>
-
-        <div 
-          onClick={() => setActiveTab(RECEPTION_TABS.BILLING)}
-          className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all border border-slate-100 flex items-center gap-4 cursor-pointer"
-        >
-          <div className="p-3 bg-amber-50 rounded-2xl text-amber-600 shadow-sm"><CreditCard className="w-6 h-6 sm:w-7 sm:h-7" /></div>
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Bills</p>
-            <p className="text-2xl sm:text-3xl font-black text-slate-800">{pendingBills.length}</p>
-          </div>
-        </div>
-
-        <div 
-          onClick={() => setActiveTab(RECEPTION_TABS.PHARMACY)}
-          className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all border border-slate-100 flex items-center gap-4 cursor-pointer"
-        >
-          <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 shadow-sm"><AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7" /></div>
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Low Stock</p>
-            <p className="text-2xl sm:text-3xl font-black text-slate-800">{lowStockMedicines.length}</p>
-          </div>
-        </div>
-
-        <div 
-          onClick={() => setActiveTab(RECEPTION_TABS.DOCTORS)}
-          className="bg-white p-5 sm:p-6 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all border border-slate-100 flex items-center gap-4 cursor-pointer"
-        >
-          <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 shadow-sm"><Stethoscope className="w-6 h-6 sm:w-7 sm:h-7" /></div>
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Doctors</p>
-            <p className="text-2xl sm:text-3xl font-black text-slate-800">{doctors.length}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================= */}
-      {/* 3. RECEPTION WORKSPACE: SIDEBAR NAVIGATION + MAIN CONTENT */}
-      {/* ========================================================= */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
+      <aside className="w-full lg:w-80 xl:w-[340px] shrink-0 lg:sticky lg:top-24 space-y-6">
         
-        {/* LEFT PROFESSIONAL SIDEBAR */}
-        <aside className="w-full lg:w-72 shrink-0">
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-6 lg:sticky lg:top-24">
+        {/* Front Desk Command Card */}
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-2xl border border-white/10 relative overflow-hidden group">
+          
+          {/* Ambient Glow */}
+          <div className="absolute -top-12 -right-12 w-36 h-36 bg-emerald-500/25 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/35 transition-all"></div>
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-600/25 rounded-full blur-2xl pointer-events-none"></div>
+
+          <div className="relative z-10 space-y-4">
             
-            {/* Front Desk Live Badge */}
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Front Desk</span>
-                <span className="text-xs font-bold text-indigo-700 flex items-center gap-1.5 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Reception & Admin
-                </span>
-              </div>
-              <span className="text-[10px] font-mono font-bold bg-white px-2 py-1 rounded-lg border border-slate-200 text-slate-600">
+            {/* Top row: Live Badge + Desk ID */}
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-extrabold uppercase tracking-wider border border-emerald-400/30 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Active Front Desk</span>
+              </span>
+              <span className="font-mono text-xs font-black text-indigo-300 bg-white/10 px-2.5 py-1 rounded-xl border border-white/15">
                 Desk-01
               </span>
             </div>
 
-            {/* Vertical Navigation Bar */}
-            <nav className="space-y-1.5">
-              {[
-                { id: RECEPTION_TABS.OPERATIONS, label: 'Operations & Queue', icon: Activity, badge: todayAppointments.length > 0 ? `${todayAppointments.length} today` : null },
-                { id: RECEPTION_TABS.SCHEDULE, label: 'Daily Doctor Schedule', icon: CalendarRange, badge: null },
-                { id: RECEPTION_TABS.DOCTORS, label: 'Manage Doctors', icon: Stethoscope, badge: `${doctors.length}` },
-                { id: RECEPTION_TABS.PATIENTS, label: 'Patient Registry', icon: User, badge: `${patients.length}` },
-                { id: RECEPTION_TABS.BILLING, label: 'Billing & Invoices', icon: CreditCard, badge: pendingBills.length > 0 ? `${pendingBills.length} pending` : null },
-                { id: RECEPTION_TABS.PHARMACY, label: 'Pharmacy Stock', icon: Pill, badge: lowStockMedicines.length > 0 ? `${lowStockMedicines.length} low` : null }
-              ].map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-150 cursor-pointer ${
-                    activeTab === item.id
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25 font-black scale-[1.02]'
-                      : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <item.icon className="w-4 h-4 shrink-0" />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge && (
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
-                      activeTab === item.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
+            {/* Title & Desk Subtitle */}
+            <div className="pt-1">
+              <h2 className="text-xl font-black text-white tracking-tight">
+                Hospital Command Desk
+              </h2>
+              <p className="text-slate-300 text-xs font-medium mt-1 leading-relaxed">
+                Centralized OPD operations, billing checkout, clinical registries & live stock.
+              </p>
+            </div>
 
-            {/* Quick Actions Footer in Sidebar */}
-            <div className="pt-4 border-t border-slate-100 space-y-2">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Quick Despatch</span>
+            {/* Quick Action Button */}
+            <div className="pt-2">
               <button
                 onClick={() => handleOpenDoctorModal()}
-                className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 font-bold text-xs border border-slate-200 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
-                <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
+                <UserPlus className="w-4 h-4 text-indigo-200" />
                 <span>Register New Doctor</span>
               </button>
             </div>
 
           </div>
-        </aside>
+        </div>
 
-        {/* RIGHT MAIN VIEW AREA */}
-        <main className="flex-1 min-w-0 w-full space-y-6">
+        {/* Aesthetic Navigation Menu */}
+        <div className="aesthetic-sidebar rounded-3xl p-3.5 space-y-1.5 shadow-sm">
+          
+          <div className="px-3 py-2 flex items-center justify-between">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+              Operations Center
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </div>
+
+          <nav className="space-y-1.5">
+            {staffNavItems.map(item => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full p-3 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer group ${
+                    isActive
+                      ? 'glow-pill-active text-white shadow-xl scale-[1.02]'
+                      : 'text-slate-600 hover:text-indigo-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-xl transition-all ${
+                      isActive 
+                        ? 'bg-white/20 text-white' 
+                        : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                    }`}>
+                      <item.icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-black text-xs block leading-tight">
+                        {item.label}
+                      </span>
+                      <span className={`text-[10px] font-medium leading-none block mt-0.5 ${
+                        isActive ? 'text-indigo-100' : 'text-slate-400'
+                      }`}>
+                        {item.subtitle}
+                      </span>
+                    </div>
+                  </div>
+
+                  {item.badge && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider border ${
+                      isActive 
+                        ? 'bg-white/20 text-white border-white/30' 
+                        : `${item.badgeColor || 'bg-slate-100 text-slate-600 border-slate-200'} bg-slate-100 text-slate-600 border-slate-200`
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Quick Refresh */}
+          <div className="pt-3 border-t border-slate-100 px-1">
+            <button
+              onClick={() => handleRefreshInventory(false)}
+              className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 font-bold text-xs border border-slate-200/80 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>Sync Pharmacy Inventory</span>
+            </button>
+          </div>
+
+        </div>
+
+      </aside>
+
+      {/* ========================================================= */}
+      {/* 2. MAIN WORKSPACE CANVAS (RIGHT SIDE - FULLY EXPANSIVE)   */}
+      {/* ========================================================= */}
+      <main className="flex-1 min-w-0 w-full space-y-6">
+        
+        {/* Top Header Bar for Receptionist Canvas */}
+        <div className="bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Staff Console
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs font-bold text-slate-500">
+                {staffNavItems.find(n => n.id === activeTab)?.label}
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
+              {staffNavItems.find(n => n.id === activeTab)?.label}
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-100 text-right">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">System Status</span>
+              <span className="text-xs font-black text-emerald-600 flex items-center gap-1.5 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Real-Time Sync Active
+              </span>
+            </div>
+
+            <button
+              onClick={() => handleOpenDoctorModal()}
+              className="py-2.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-black text-xs shadow-md shadow-indigo-500/25 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Add Doctor</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4 STATS CARDS ROW */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+          <div 
+            onClick={() => setActiveTab(RECEPTION_TABS.OPERATIONS)}
+            className="aesthetic-card p-5 sm:p-6 rounded-3xl flex items-center gap-4 cursor-pointer group"
+          >
+            <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-800">{todayAppointments.length}</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Visits</p>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab(RECEPTION_TABS.BILLING)}
+            className="aesthetic-card p-5 sm:p-6 rounded-3xl flex items-center gap-4 cursor-pointer group"
+          >
+            <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <CreditCard className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-800">{pendingBills.length}</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Bills</p>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab(RECEPTION_TABS.PHARMACY)}
+            className="aesthetic-card p-5 sm:p-6 rounded-3xl flex items-center gap-4 cursor-pointer group"
+          >
+            <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-800">{lowStockMedicines.length}</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Low Stock</p>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab(RECEPTION_TABS.DOCTORS)}
+            className="aesthetic-card p-5 sm:p-6 rounded-3xl flex items-center gap-4 cursor-pointer group"
+          >
+            <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <Stethoscope className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-800">{doctors.length}</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Doctors</p>
+            </div>
+          </div>
+        </div>
 
       {/* ========================================================= */}
       {/* 4. TAB 1: OPERATIONS & TODAY'S APPOINTMENT QUEUE          */}
@@ -961,7 +1027,7 @@ const ReceptionistDashboard = ({ data, onUpdate }) => {
                     {bills.map(b => (
                       <tr key={b.bill_id} className="hover:bg-slate-50 transition">
                         <td className="px-4 py-3.5 font-mono font-bold text-slate-700">#{b.bill_id}</td>
-                        <td className="px-4 py-3.5 font-bold text-slate-800">{b.patient_name}</td>
+                        <td className="px-4 py-3.5 font-bold text-slate-800">{b.patient_name || getPatientName(b.patient_id, patients) || `Patient #${b.patient_id}`}</td>
                         <td className="px-4 py-3.5 text-slate-500 max-w-[150px] truncate">{b.description}</td>
                         <td className="px-4 py-3.5 font-black text-indigo-700">₹{b.amount}</td>
                         <td className="px-4 py-3.5">
@@ -1134,8 +1200,7 @@ const ReceptionistDashboard = ({ data, onUpdate }) => {
         </div>
       )}
 
-        </main>
-      </div>
+      </main>
 
       {/* ========================================================= */}
       {/* 10. DOCTOR ADD/EDIT MODAL                                  */}

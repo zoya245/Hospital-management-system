@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
 import { API_BASE_URL } from '../config';
-import { LoaderCircle, Send, CheckCircle, ArrowLeft, UserCircle, KeyRound, Mail, Phone, MapPin, Calendar, Users } from 'lucide-react';
+import { LoaderCircle, Send, CheckCircle, ArrowLeft, UserCircle, KeyRound, Mail, Phone, MapPin, Calendar, Users, Sparkles } from 'lucide-react';
 
 const PatientLogin = ({ onLoginSuccess, onRegister, initialTab = 'signin' }) => {
   const [tab, setTab] = useState(initialTab);
@@ -102,13 +102,11 @@ const PatientLogin = ({ onLoginSuccess, onRegister, initialTab = 'signin' }) => 
     }
   };
 
-  // --- 3. REGISTER (With OTP) ---
+  // --- 3. REGISTER (Auto Login on Success) ---
   const handleRegister = async (e) => {
     e.preventDefault();
     setRegError('');
 
-    if (!otpSent) return setRegError("Please request an OTP first.");
-    if (!otp) return setRegError("Please enter the OTP sent to your email.");
     if (regPassword !== regConfirmPassword) return setRegError('Passwords do not match.');
 
     setIsRegistering(true);
@@ -117,18 +115,34 @@ const PatientLogin = ({ onLoginSuccess, onRegister, initialTab = 'signin' }) => 
       const newPatientData = {
         name: regName,
         email: regEmail,
-        age: parseInt(regAge),
+        age: parseInt(regAge) || null,
         gender: regGender,
         phone: regPhone,
         address: regAddress,
         password: regPassword,
-        otp: otp 
+        otp: otp || undefined 
       };
 
       const result = await api.auth.registerPatient(newPatientData);
-      onRegister(result);
+      
+      const patId = result.patient_id || result.user?.patient_id || result.user?.id;
+      const patName = result.name || result.user?.name || regName;
+
+      // Auto login: Save token and user details to localStorage
+      if (result.token) {
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('user_id', String(patId));
+        localStorage.setItem('user_name', patName);
+        localStorage.setItem('user_role', 'Patient');
+      }
+
+      if (onRegister) {
+        onRegister(result);
+      } else if (onLoginSuccess) {
+        onLoginSuccess('Patient', patId, patName);
+      }
     } catch (err) {
-      setRegError(err.message);
+      setRegError(err.message || 'Registration failed.');
     } finally {
       setIsRegistering(false);
     }
@@ -314,18 +328,23 @@ const PatientLogin = ({ onLoginSuccess, onRegister, initialTab = 'signin' }) => 
             </div>
           </div>
 
-          {/* 🔴 NEW: DEDICATED EMAIL OTP SECTION */}
+          {/* DEDICATED EMAIL OTP SECTION (OPTIONAL) */}
           {!otpSent ? (
-              <button type="button" onClick={handleSendOtp} disabled={isSendingOtp || regPhone.length !== 10 || !regEmail.includes('@')} className={`w-full py-3 rounded-xl font-bold text-white shadow-md transition-all hover:scale-[1.02] active:scale-95 flex justify-center items-center disabled:opacity-50 mt-2 ${theme.bg} ${theme.hoverBg}`}>
-                  {isSendingOtp ? <LoaderCircle className="animate-spin w-5 h-5"/> : <><Send className="w-4 h-4 mr-2"/> Send OTP to Email</>}
-              </button>
-          ) : (
-              <div className="animate-slide-in p-5 bg-indigo-50 rounded-xl border border-indigo-100 mt-2 shadow-inner">
-                  <div className="flex items-center justify-center text-indigo-700 font-bold mb-4">
-                      <CheckCircle className="w-5 h-5 mr-2 text-emerald-500"/> OTP Sent to Inbox!
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 p-2.5 rounded-xl">
+                  <div className="text-xs text-slate-500">
+                    Verify via email OTP? <span className="text-slate-400 font-normal">(Optional)</span>
                   </div>
-                  <label className="block text-xs font-bold text-indigo-700 uppercase mb-2 text-center">Enter 6-Digit Code</label>
-                  <input type="text" value={otp} onChange={(e) => setOtp(e.target.value)} className={`w-full p-3 border-2 border-indigo-200 rounded-xl focus:border-indigo-500 font-mono text-center text-xl tracking-[0.5em] outline-none bg-white`} maxLength="6" placeholder="------" required />
+                  <button type="button" onClick={handleSendOtp} disabled={isSendingOtp || !regEmail.includes('@')} className={`text-xs px-3 py-1.5 rounded-lg font-bold text-white transition disabled:opacity-40 flex items-center gap-1 cursor-pointer ${theme.bg} ${theme.hoverBg}`}>
+                      {isSendingOtp ? <LoaderCircle className="animate-spin w-3.5 h-3.5"/> : <><Send className="w-3 h-3"/> Send OTP</>}
+                  </button>
+              </div>
+          ) : (
+              <div className="animate-slide-in p-4 bg-indigo-50 rounded-xl border border-indigo-100 shadow-inner">
+                  <div className="flex items-center justify-between text-indigo-700 font-bold text-xs mb-2">
+                      <span className="flex items-center"><CheckCircle className="w-4 h-4 mr-1.5 text-emerald-500"/> Verification Code</span>
+                      <span className="text-[10px] text-indigo-500 font-medium">6-Digit Code</span>
+                  </div>
+                  <input type="text" value={otp} onChange={(e) => setOtp(e.target.value)} className={`w-full p-2.5 border-2 border-indigo-200 rounded-xl focus:border-indigo-500 font-mono text-center text-lg tracking-[0.4em] outline-none bg-white`} maxLength="6" placeholder="------" />
               </div>
           )}
 
@@ -375,8 +394,8 @@ const PatientLogin = ({ onLoginSuccess, onRegister, initialTab = 'signin' }) => 
               </div>
           </div>
 
-          <button type="submit" className="w-full py-3.5 mt-2 rounded-xl font-bold text-white shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 disabled:opacity-50" disabled={isRegistering || !otpSent}>
-            {isRegistering ? <LoaderCircle className="animate-spin w-5 h-5"/> : 'Create Patient Account'}
+          <button type="submit" className="w-full py-3.5 mt-2 rounded-xl font-bold text-white shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 disabled:opacity-50 cursor-pointer" disabled={isRegistering}>
+            {isRegistering ? <LoaderCircle className="animate-spin w-5 h-5"/> : 'Create Patient Account & Sign In'}
           </button>
         </form>
       )}

@@ -529,6 +529,13 @@ export const api = {
         body: JSON.stringify({ status: 'Paid' }) 
       }).then(handleResponse),
 
+    updateStatus: (id, status) => 
+      fetch(`${API_BASE_URL}/bills/${id}`, { 
+        method: 'PATCH', 
+        headers: getHeaders(), 
+        body: JSON.stringify({ status }) 
+      }).then(handleResponse),
+
     // --- RAZORPAY ENDPOINTS ---
     createOrder: (bill_id) => 
       fetch(`${API_BASE_URL}/payments/create-order`, { 

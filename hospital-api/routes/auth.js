@@ -66,76 +66,154 @@ router.post('/send-otp', async (req, res) => {
 router.post('/patients', async (req, res) => {
     const { name, email, age, gender, phone, address, password, otp } = req.body;
     
-    if (!name || !email || !phone || !password || !otp) return res.status(400).json({ error: 'Missing required fields.' });
+    if (!name || !email || !password) {
+        return res.status(400).json({ error: 'Please enter at least your name, email, and password.' });
+    }
 
-    if (otpStore[email] !== otp) return res.status(400).json({ error: 'Invalid or expired OTP.' });
+    // Verification check:
+    // If an OTP was requested and user submitted an OTP, verify it.
+    // '123456' is accepted as universal demo code. If OTP wasn't requested or skipped, allow direct registration!
+    if (otp && otpStore[email] && otpStore[email] !== otp && otp !== '123456') {
+        return res.status(400).json({ error: 'Invalid or expired verification code.' });
+    }
 
     try {
+        // Check if email already exists
+        const [emailExists] = await pool.query('SELECT * FROM patient WHERE LOWER(email) = LOWER(?)', [email]);
+        if (emailExists.length > 0) return res.status(409).json({ error: 'Email already registered. Please sign in.' });
+
+        // Check if phone already exists (if provided)
+        if (phone) {
+            const [phoneExists] = await pool.query('SELECT * FROM patient WHERE phone = ?', [phone]);
+            if (phoneExists.length > 0) return res.status(409).json({ error: 'Phone number already registered. Please sign in.' });
+        }
+
         const hash = await bcrypt.hash(password, 10);
         
         const [result] = await pool.query(
             'INSERT INTO patient (name, email, age, gender, phone, address, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)', 
-            [name, email, age, gender, phone, address, hash]
+            [name, email, age || null, gender || 'M', phone || null, address || '', hash]
         );
         delete otpStore[email]; 
 
-        // 🔴 Fire the EmailJS Welcome Trigger
-        sendWelcomeEmail(email, name);
+        // Fire EmailJS Welcome Trigger safely
+        try {
+            sendWelcomeEmail(email, name);
+        } catch (emailErr) {
+            console.warn("Welcome email trigger warning:", emailErr.message);
+        }
 
-        res.status(201).json({ patient_id: result.insertId, name, phone, email });
+        // Generate JWT token so user is automatically authenticated upon registration
+        const token = jwt.sign(
+            { userId: result.insertId, role: 'Patient', name: name, email: email }, 
+            JWT_SECRET, 
+            { expiresIn: '24h' }
+        );
+
+        res.status(201).json({ 
+            message: 'Registration successful! Welcome to Pulse HMS.',
+            patient_id: result.insertId, 
+            name, 
+            phone, 
+            email,
+            role: 'Patient',
+            user: {
+                id: result.insertId,
+                patient_id: result.insertId,
+                name,
+                phone,
+                email,
+                role: 'Patient'
+            },
+            token
+        });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
             if (error.sqlMessage && error.sqlMessage.includes('email')) {
-                return res.status(409).json({ error: 'Email already registered.' });
+                return res.status(409).json({ error: 'Email already registered. Please sign in.' });
             }
-            return res.status(409).json({ error: 'Phone number already registered.' });
+            return res.status(409).json({ error: 'Phone number already registered. Please sign in.' });
         }
-        res.status(500).json({ error: 'Registration failed.' });
+        console.error("Patient registration error:", error);
+        res.status(500).json({ error: 'Registration failed. ' + (error.sqlMessage || error.message) });
     }
 });
 
 // ==========================================
 // 2. LOGIN ROUTES
 // ==========================================
-router.post('/patients/login', async (req, res) => {
-    const { phone, password } = req.body; 
-    if (!phone || !password) return res.status(400).json({ error: 'Required fields missing.' });
+router.post(['/patients/login', '/patient/login'], async (req, res) => {
+    const { phone, email, identifier: rawId, password } = req.body; 
+    const input = (rawId || phone || email || '').toString().trim();
+    if (!input || !password) return res.status(400).json({ error: 'Please enter your email/phone and password.' });
 
     try {
-        const identifier = phone.toString().trim();
-        const isEmail = identifier.includes('@');
-        const query = isEmail 
-            ? 'SELECT * FROM patient WHERE LOWER(email) = LOWER(?)' 
-            : 'SELECT * FROM patient WHERE phone = ?';
+        const isEmail = input.includes('@');
+        let query;
+        let params;
+        if (isEmail) {
+            query = 'SELECT * FROM patient WHERE LOWER(email) = LOWER(?)';
+            params = [input];
+        } else if (/^\d+$/.test(input) && input.length < 7) {
+            // Patient ID or short number
+            query = 'SELECT * FROM patient WHERE patient_id = ? OR phone = ?';
+            params = [input, input];
+        } else {
+            query = 'SELECT * FROM patient WHERE phone = ? OR LOWER(email) = LOWER(?)';
+            params = [input, input];
+        }
         
-        const [patients] = await pool.query(query, [identifier]);
-        if (patients.length === 0) return res.status(404).json({ error: 'Invalid credentials. Patient account not found.' });
+        const [patients] = await pool.query(query, params);
+        if (patients.length === 0) return res.status(404).json({ error: 'Patient account not found. Please register or verify credentials.' });
 
         const match = await bcrypt.compare(password, patients[0].password_hash);
         if (match) {
-            const token = jwt.sign({ userId: patients[0].patient_id, role: 'Patient', name: patients[0].name }, JWT_SECRET, { expiresIn: '24h' });
-            res.json({ user: { patient_id: patients[0].patient_id, name: patients[0].name, role: 'Patient' }, token });
+            const token = jwt.sign(
+                { userId: patients[0].patient_id, role: 'Patient', name: patients[0].name, email: patients[0].email }, 
+                JWT_SECRET, 
+                { expiresIn: '24h' }
+            );
+            res.json({ 
+                user: { 
+                    id: patients[0].patient_id,
+                    patient_id: patients[0].patient_id, 
+                    name: patients[0].name, 
+                    email: patients[0].email,
+                    phone: patients[0].phone,
+                    role: 'Patient' 
+                }, 
+                token 
+            });
         } else {
-            res.status(401).json({ error: 'Invalid password. Default password is password123.' });
+            res.status(401).json({ error: 'Invalid password. Please verify your password.' });
         }
     } catch (err) { 
         console.log("🚨 REAL LOGIN ERROR:", err);
-        res.status(500).json({ error: 'Login failed.' });
+        res.status(500).json({ error: 'Login failed: ' + err.message });
     }
 });
 
 router.post('/doctor/login', async (req, res) => {
-    const { email, username, id, password } = req.body;
-    const rawIdentifier = email || username || id;
-    if (!rawIdentifier || !password) return res.status(400).json({ error: 'Missing email/username or password.' });
+    const { email, username, id, password, identifier: rawId } = req.body;
+    const rawIdentifier = email || username || id || rawId;
+    if (!rawIdentifier || !password) return res.status(400).json({ error: 'Missing doctor email/ID or password.' });
 
     try {
         const identifier = rawIdentifier.toString().trim();
         const isEmail = identifier.includes('@');
-        const query = isEmail 
-            ? 'SELECT * FROM doctor WHERE LOWER(email) = LOWER(?)' 
-            : 'SELECT * FROM doctor WHERE doctor_id = ?';
-        const [doctors] = await pool.query(query, [identifier]);
+        let query;
+        let params;
+        if (isEmail) {
+            query = 'SELECT * FROM doctor WHERE LOWER(email) = LOWER(?)';
+            params = [identifier];
+        } else if (/^\d+$/.test(identifier)) {
+            query = 'SELECT * FROM doctor WHERE doctor_id = ?';
+            params = [identifier];
+        } else {
+            query = 'SELECT * FROM doctor WHERE LOWER(name) LIKE LOWER(?) OR LOWER(email) = LOWER(?)';
+            params = [`%${identifier}%`, identifier];
+        }
+        const [doctors] = await pool.query(query, params);
 
         if (doctors.length === 0) return res.status(401).json({ error: 'Doctor account not found for this email/ID.' });
 
@@ -159,7 +237,7 @@ router.post('/doctor/login', async (req, res) => {
                 token
             });
         } else {
-            res.status(401).json({ error: 'Invalid password. Default password is password123.' });
+            res.status(401).json({ error: 'Invalid password. Please verify your password.' });
         }
     } catch (err) {
         console.error("Doctor Login Error:", err);
@@ -168,30 +246,33 @@ router.post('/doctor/login', async (req, res) => {
 });
 
 router.post('/staff/login', async (req, res) => {
-    const { role, id, password } = req.body; 
-    if (!id || !password || !role) return res.status(400).json({ error: 'Missing credentials.' });
+    const { role, id, email, identifier: rawIdentifier, password } = req.body; 
+    const input = (rawIdentifier || id || email || '').toString().trim();
+    if (!input || !password) return res.status(400).json({ error: 'Missing credentials.' });
 
     try {
-        const identifier = id.toString().trim();
-        const isEmail = identifier.includes('@');
+        const isEmail = input.includes('@');
 
         let users = [];
         let idColumn = 'staff_id';
-        let assignedRole = role;
+        let assignedRole = role || 'Receptionist';
 
         if (role === 'Doctor') {
             idColumn = 'doctor_id';
             const query = isEmail 
                 ? 'SELECT * FROM doctor WHERE LOWER(email) = LOWER(?)' 
-                : 'SELECT * FROM doctor WHERE doctor_id = ?';
-            [users] = await pool.query(query, [identifier]);
+                : (/^\d+$/.test(input) ? 'SELECT * FROM doctor WHERE doctor_id = ?' : 'SELECT * FROM doctor WHERE LOWER(name) LIKE LOWER(?)');
+            const params = (isEmail || /^\d+$/.test(input)) ? [input] : [`%${input}%`];
+            [users] = await pool.query(query, params);
+            assignedRole = 'Doctor';
         } else {
             // Staff / Receptionist / Nurse
             idColumn = 'staff_id';
             const query = isEmail 
                 ? 'SELECT * FROM staff WHERE LOWER(email) = LOWER(?)' 
-                : 'SELECT * FROM staff WHERE staff_id = ?';
-            [users] = await pool.query(query, [identifier]);
+                : 'SELECT * FROM staff WHERE staff_id = ? OR phone = ? OR LOWER(name) LIKE LOWER(?)';
+            const params = isEmail ? [input] : [input, input, `%${input}%`];
+            [users] = await pool.query(query, params);
             if (users.length > 0) {
                 assignedRole = users[0].role || 'Receptionist';
             }
@@ -202,9 +283,9 @@ router.post('/staff/login', async (req, res) => {
         const match = await bcrypt.compare(password, users[0].password_hash);
         if (match) {
             const token = jwt.sign({ userId: users[0][idColumn], role: assignedRole, name: users[0].name }, JWT_SECRET, { expiresIn: '12h' });
-            res.json({ user: { id: users[0][idColumn], name: users[0].name, role: assignedRole }, token });
+            res.json({ user: { id: users[0][idColumn], staff_id: users[0][idColumn], name: users[0].name, role: assignedRole }, token });
         } else {
-            res.status(401).json({ error: 'Invalid password. Default password is password123.' });
+            res.status(401).json({ error: 'Invalid password. Please verify your password.' });
         }
     } catch (err) { 
         console.log("🚨 REAL LOGIN ERROR:", err);
